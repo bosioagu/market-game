@@ -38,6 +38,8 @@ export class PlayScene implements Scene {
   }
 
   enter(app: App): void {
+    // Jugando solo, las flechas y WASD manejan al mismo personaje.
+    app.input.unirTeclados = this.mode === 'solo';
     const def = store(this.storeId);
     const seed = Date.now() >>> 0;
 

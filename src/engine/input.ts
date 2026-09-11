@@ -5,6 +5,10 @@
  * pad 1 es el jugador 2 (flechas). Cada pad puede ser alimentado por cualquiera
  * de las tres fuentes, así que la lógica del juego no sabe ni le importa si la
  * persona está usando teclado, joystick o la pantalla del celular.
+ *
+ * Cuando se juega solo no hay segundo jugador que pueda quedarse sin teclas, así
+ * que `unirTeclados` hace que el pad 0 acepte los dos juegos a la vez: WASD y
+ * las flechas mueven al mismo personaje.
  */
 
 import { clamp } from './math';
@@ -63,6 +67,11 @@ export class Input {
   private downEdge = new Set<string>();
   private upEdge = new Set<string>();
   private virtual: VirtualPad[] = [newVirtual(), newVirtual()];
+  /**
+   * En un jugador, el pad 0 responde a los dos teclados (WASD y flechas).
+   * En dos jugadores queda en false para que cada uno tenga el suyo.
+   */
+  unirTeclados = false;
   private prevGamepadButtons: boolean[][] = [[], []];
   private prevGamepadDrop: boolean[] = [false, false];
   private pads: PadState[] = [newPad(), newPad()];
@@ -231,7 +240,7 @@ export class Input {
   }
 
   private buildPad(index: number): PadState {
-    const map = KEY_MAPS[index];
+    const maps = this.unirTeclados && index === 0 ? KEY_MAPS : [KEY_MAPS[index]];
     const prev = this.pads[index];
     let ax = 0;
     let ay = 0;
@@ -239,18 +248,20 @@ export class Input {
     let actionPressed = false;
     let dropPressed = false;
 
-    if (map) {
-      // Se cuenta como activa una tecla que sigue apretada O que se apretó en
-      // este frame: si no, un toque de menos de 16 ms se perdería entre frames.
-      const dir = (codes: readonly string[]): boolean =>
-        anyHeld(this.held, codes) || anyHeld(this.downEdge, codes);
+    // Se cuenta como activa una tecla que sigue apretada O que se apretó en
+    // este frame: si no, un toque de menos de 16 ms se perdería entre frames.
+    const dir = (codes: readonly string[]): boolean =>
+      anyHeld(this.held, codes) || anyHeld(this.downEdge, codes);
+
+    for (const map of maps) {
+      if (!map) continue;
       if (dir(map.left)) ax -= 1;
       if (dir(map.right)) ax += 1;
       if (dir(map.up)) ay -= 1;
       if (dir(map.down)) ay += 1;
-      action = anyHeld(this.held, map.action);
-      actionPressed = anyHeld(this.downEdge, map.action);
-      dropPressed = anyHeld(this.downEdge, map.drop);
+      action = action || anyHeld(this.held, map.action);
+      actionPressed = actionPressed || anyHeld(this.downEdge, map.action);
+      dropPressed = dropPressed || anyHeld(this.downEdge, map.drop);
     }
 
     const v = this.virtual[index];

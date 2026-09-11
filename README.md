@@ -52,6 +52,11 @@ baja la fama, y con menos fama viene menos gente al día siguiente.
 
 ## Controles
 
+**Jugando solo** los dos teclados manejan al mismo personaje: `W` `A` `S` `D` o
+las flechas, indistintamente, y `Espacio` o `Enter` para la acción.
+
+**De a dos** cada uno tiene el suyo:
+
 | | Jugador 1 | Jugador 2 |
 |---|---|---|
 | Moverse | `W` `A` `S` `D` | flechas |

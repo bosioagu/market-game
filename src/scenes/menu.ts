@@ -16,7 +16,7 @@ import { PlayScene } from './play';
 type Step = 'titulo' | 'modo' | 'tienda';
 
 const MODES: { id: GameMode; name: string; detail: string }[] = [
-  { id: 'solo', name: 'UN JUGADOR', detail: 'TU CARRERA: SUBÍ DE NIVEL Y ABRÍ TIENDAS NUEVAS' },
+  { id: 'solo', name: 'UN JUGADOR', detail: 'WASD O FLECHAS. SUBÍ DE NIVEL Y ABRÍ TIENDAS NUEVAS' },
   { id: 'coop', name: 'DOS EN EQUIPO', detail: 'MISMA TIENDA, PANTALLA DIVIDIDA. UNO REPONE, OTRO COBRA' },
   { id: 'versus', name: 'DOS COMPITIENDO', detail: 'UNA TIENDA CADA UNO. GANA QUIEN HAGA MÁS PLATA' },
 ];
@@ -32,8 +32,9 @@ export class MenuScene implements Scene {
     this.step = step;
   }
 
-  enter(): void {
+  enter(app: App): void {
     this.cursor.reset(0);
+    app.input.unirTeclados = true;
   }
 
   update(dt: number, app: App): void {
@@ -160,7 +161,12 @@ export class MenuScene implements Scene {
         scale: s,
       });
     }
-    drawText(ctx, `NIVEL ${careerLevel(app.progress)}   $${Math.round(app.progress.money)}   DÍA ${app.progress.day}`, cx, Math.round(h * 0.93), {
+    drawText(ctx, 'WASD O FLECHAS PARA MOVERSE - ESPACIO PARA LA ACCIÓN', cx, Math.round(h * 0.905), {
+      color: UI.dim,
+      align: 'center',
+      scale: s,
+    });
+    drawText(ctx, `NIVEL ${careerLevel(app.progress)}   $${Math.round(app.progress.money)}   DÍA ${app.progress.day}`, cx, Math.round(h * 0.95), {
       color: UI.dim,
       align: 'center',
       scale: s,
