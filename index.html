@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#15111f" />
+    <meta name="description" content="Mía & Kiki Market: comprá stock, poné precios, reponé las góndolas y cobrá. Para uno o dos jugadores en pantalla dividida." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./icono.svg" />
+    <link rel="apple-touch-icon" href="./icono.svg" />
+    <title>Mía &amp; Kiki Market</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #15111f;
+        /* Evita el rebote y el zoom por doble toque en el celular. */
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      }
+      #juego {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        touch-action: none;
+      }
+      #cargando {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 12px;
+        text-align: center;
+        color: #f5ecdd;
+        background: #15111f;
+        letter-spacing: 2px;
+      }
+      #cargando b {
+        color: #ffd36a;
+        font-size: 20px;
+      }
+      noscript {
+        color: #f5ecdd;
+        display: block;
+        padding: 24px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="juego"></canvas>
+    <div id="cargando"><b>MÍA &amp; KIKI MARKET</b><span>cargando…</span></div>
+    <noscript>Para jugar hace falta activar JavaScript.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

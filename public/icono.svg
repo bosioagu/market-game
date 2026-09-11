@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" shape-rendering="crispEdges" width="512" height="512">
+  <title>Mía &amp; Kiki Market</title>
+  <rect width="48" height="48" fill="#2b2140"/>
+  <!-- bolsa de compras -->
+  <rect x="10" y="16" width="28" height="24" fill="#221c2a"/>
+  <rect x="12" y="18" width="24" height="20" fill="#e0533f"/>
+  <rect x="12" y="18" width="24" height="3" fill="#f2789d"/>
+  <!-- manijas -->
+  <rect x="16" y="10" width="4" height="7" fill="#221c2a"/>
+  <rect x="28" y="10" width="4" height="7" fill="#221c2a"/>
+  <rect x="16" y="8" width="16" height="3" fill="#221c2a"/>
+  <rect x="19" y="11" width="10" height="3" fill="#2b2140"/>
+  <!-- etiqueta de precio -->
+  <rect x="18" y="24" width="12" height="10" fill="#ffd36a"/>
+  <rect x="20" y="26" width="2" height="6" fill="#221c2a"/>
+  <rect x="22" y="26" width="4" height="2" fill="#221c2a"/>
+  <rect x="22" y="29" width="4" height="2" fill="#221c2a"/>
+  <rect x="26" y="26" width="2" height="6" fill="#221c2a"/>
+</svg>

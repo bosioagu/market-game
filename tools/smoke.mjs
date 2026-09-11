@@ -1,0 +1,158 @@
+/**
+ * Prueba de humo: abre el juego en Chromium, lo juega un rato y saca capturas.
+ *   npm run build && npx vite preview --port 4180 &
+ *   SHOTS=./capturas URL=http://localhost:4180 node tools/smoke.mjs
+ */
+import { chromium } from 'playwright';
+import { mkdirSync } from 'node:fs';
+
+const OUT = process.env.SHOTS ?? 'capturas';
+const URL = process.env.URL ?? 'http://localhost:4180';
+mkdirSync(OUT, { recursive: true });
+
+const errors = [];
+const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium' });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(m.text()); });
+page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+
+const shot = (name) => page.screenshot({ path: `${OUT}/${name}.png` });
+const hold = async (key, ms) => { await page.keyboard.down(key); await page.waitForTimeout(ms); await page.keyboard.up(key); };
+const state = () => page.evaluate(() => {
+  const scene = window.juego?.scene ?? window.juego?.['scene'];
+  const sim = scene?.sims?.[0];
+  if (!sim) return null;
+  return {
+    plata: Math.round(sim.money),
+    clientes: sim.customers.length,
+    cajas: sim.world.boxes.length,
+    enGondola: sim.world.shelves.reduce((n, s) => n + s.units, 0),
+    atendidos: sim.stats.served,
+    ventas: sim.stats.revenue,
+    perdidos: sim.stats.lost,
+  };
+});
+
+await page.goto(URL, { waitUntil: 'networkidle' });
+await page.waitForTimeout(600);
+await shot('1-titulo');
+
+await page.keyboard.press('Space'); await page.waitForTimeout(350); await shot('2-modos');
+await page.keyboard.press('Space'); await page.waitForTimeout(350); await shot('3-tiendas');
+await page.keyboard.press('Space'); await page.waitForTimeout(900); await shot('4-local');
+
+// Ir al depósito (derecha) y levantar una caja.
+await hold('KeyD', 4200);
+await page.waitForTimeout(200);
+await shot('5-deposito');
+await page.keyboard.press('Space');
+await page.waitForTimeout(300);
+
+// Llevarla a una góndola y reponer manteniendo el botón.
+await hold('KeyW', 900);
+await hold('KeyA', 1200);
+await page.waitForTimeout(200);
+await shot('6-frente-a-gondola');
+await hold('Space', 2600);
+await page.waitForTimeout(200);
+await shot('7-repuesta');
+
+// Volver a la computadora y comprar stock.
+await hold('KeyS', 1400);
+await hold('KeyD', 1600);
+await page.waitForTimeout(200);
+await page.keyboard.press('Space');
+await page.waitForTimeout(400);
+await shot('8-mayorista');
+await page.keyboard.press('KeyD'); await page.keyboard.press('KeyD');
+await page.waitForTimeout(150);
+await page.keyboard.press('Space');
+await page.waitForTimeout(350);
+await shot('9-compra');
+await page.keyboard.press('KeyW'); // baja a la pestaña anterior -> precios
+await page.waitForTimeout(250);
+await shot('10-precios');
+await page.keyboard.press('KeyQ');
+await page.waitForTimeout(300);
+
+// Llenar las góndolas usando la API del juego: así la prueba verifica la
+// simulación (clientes, fila, cobro) y no mi puntería con el teclado.
+await page.evaluate(() => {
+  const sim = window.juego.scene.sims[0];
+  const ids = sim.catalogue;
+  for (const id of ids) sim.buyBoxes(id, 1);
+  sim.world.shelves.forEach((sh, i) => {
+    sh.productId = ids[i % ids.length];
+    sh.units = sh.capacity;
+  });
+});
+
+// Dejar que entren clientes y lleguen a la caja.
+await page.waitForTimeout(26000);
+await shot('11-con-clientes');
+const mitad = await state();
+console.log('mitad del día:', JSON.stringify(mitad));
+
+// Poner al jugador detrás de la caja y cobrar.
+await page.evaluate(() => {
+  const sim = window.juego.scene.sims[0];
+  const reg = sim.world.registers[0];
+  sim.players[0].carrying = null;
+  sim.players[0].pos.x = reg.staff.x;
+  sim.players[0].pos.y = reg.staff.y;
+});
+await hold('Space', 6000);
+await page.waitForTimeout(400);
+await shot('12-cobrando');
+const fin = await state();
+console.log('después de cobrar:', JSON.stringify(fin));
+
+if (!(mitad.clientes > 0)) errors.push('no entró ningún cliente');
+if (!(fin.atendidos > 0)) errors.push('no se pudo cobrar a ningún cliente');
+if (!(fin.ventas > 0)) errors.push('las ventas quedaron en cero');
+
+// Adelantar el reloj para ver el cierre del día y el resumen.
+await page.evaluate(() => { window.juego.scene.elapsed = 164; });
+await page.waitForTimeout(15000);
+await shot('13-cierre-del-dia');
+const enResultados = await page.evaluate(() => !!window.juego.scene.args);
+console.log('llegó a la pantalla de cierre:', enResultados);
+if (!enResultados) errors.push('el día no terminó en la pantalla de resultados');
+
+// --- Pantalla dividida: cooperativo y competencia, en PC y en celular ---
+async function dosJugadores(width, height, nombre, bajadas) {
+  const p2 = await browser.newPage({ viewport: { width, height } });
+  p2.on('pageerror', (e) => errors.push(`${nombre}: ${e.message}`));
+  await p2.goto(URL, { waitUntil: 'networkidle' });
+  await p2.waitForTimeout(600);
+  await p2.keyboard.press('Space');
+  await p2.waitForTimeout(300);
+  for (let i = 0; i < bajadas; i++) { await p2.keyboard.press('KeyS'); await p2.waitForTimeout(140); }
+  await p2.keyboard.press('Space');
+  await p2.waitForTimeout(300);
+  await p2.keyboard.press('Space');
+  await p2.waitForTimeout(1000);
+
+  const vistas = await p2.evaluate(() => {
+    const sims = window.juego.scene.sims;
+    for (const sim of sims) {
+      const ids = sim.catalogue;
+      sim.world.shelves.forEach((sh, i) => { sh.productId = ids[i % ids.length]; sh.units = sh.capacity; });
+    }
+    return sims.length;
+  });
+  await p2.waitForTimeout(16000);
+  await p2.screenshot({ path: `${OUT}/${nombre}.png` });
+  const info = await p2.evaluate(() => window.juego.scene.sims.map((s) => s.customers.length));
+  console.log(`${nombre}: ${vistas} local(es), clientes por local ${JSON.stringify(info)}`);
+  await p2.close();
+}
+
+await dosJugadores(1280, 720, '14-coop-pc', 1);
+await dosJugadores(1280, 720, '15-versus-pc', 2);
+await dosJugadores(844, 390, '16-coop-celular-apaisado', 1);
+await dosJugadores(390, 844, '17-coop-celular-vertical', 1);
+
+console.log(errors.length ? 'ERRORES:\n' + errors.join('\n') : 'sin errores de consola');
+await browser.close();
+if (errors.length) process.exit(1);

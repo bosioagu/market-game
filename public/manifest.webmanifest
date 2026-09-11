@@ -1,0 +1,20 @@
+{
+  "name": "Mía & Kiki Market",
+  "short_name": "Mía & Kiki",
+  "description": "Comprá stock, poné precios, reponé las góndolas y cobrá. Para uno o dos jugadores en pantalla dividida.",
+  "lang": "es-AR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#15111f",
+  "theme_color": "#15111f",
+  "icons": [
+    {
+      "src": "./icono.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
