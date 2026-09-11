@@ -262,7 +262,7 @@ export class ManagerUi {
       align: 'right',
       scale: s,
     });
-    drawText(ctx, '↑↓ MOVER · EXTREMOS = PESTAÑA', x + 4 * s, footY, { color: UI.dim, scale: s });
+    drawText(ctx, '↑↓ MOVER - EXTREMOS = PESTAÑA', x + 4 * s, footY, { color: UI.dim, scale: s });
     if (count > visible) {
       drawText(ctx, `${this.row + 1}/${count}`, x + w - 4 * s, footY, {
         color: UI.dim,

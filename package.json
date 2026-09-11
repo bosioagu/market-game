@@ -6,13 +6,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && node tools/check-font.mjs && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "mobile:sync": "npm run build && cap sync",
     "mobile:android": "npm run mobile:sync && cap open android",
     "mobile:ios": "npm run mobile:sync && cap open ios",
-    "smoke": "node tools/smoke.mjs"
+    "smoke": "node tools/smoke.mjs",
+    "check:font": "node tools/check-font.mjs"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.2",

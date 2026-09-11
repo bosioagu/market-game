@@ -33,14 +33,14 @@ export function drawHud(
   const dayText = `DÍA ${info.day}`;
   const clock = clockFor(info.elapsed);
   const leftW = Math.max(textWidth(dayText, s), textWidth(clock, s)) + 10 * s;
-  const leftH = 24 * s;
+  const leftH = 28 * s;
   plaque(ctx, vp.x + pad, vp.y + pad, leftW, leftH);
   drawText(ctx, dayText, vp.x + pad + 5 * s, vp.y + pad + 3 * s, { color: UI.text, scale: s });
   drawText(ctx, clock, vp.x + pad + 5 * s, vp.y + pad + 12 * s, { color: UI.gold, scale: s });
   drawBar(
     ctx,
     vp.x + pad + 5 * s,
-    vp.y + pad + leftH - 6 * s,
+    vp.y + pad + leftH - 5 * s,
     leftW - 10 * s,
     2 * s,
     clamp(info.elapsed / DAY_SECONDS, 0, 1),
@@ -107,13 +107,20 @@ function drawStockAlerts(ctx: CanvasRenderingContext2D, vp: Viewport, sim: Store
     .slice(0, 4);
   if (low.length === 0) return;
 
+  // "0+12" = no queda nada en góndola pero hay 12 unidades en cajas sin abrir.
+  const valor = (id: string, n: number): string => {
+    const enCaja = inBoxes.get(id) ?? 0;
+    return enCaja > 0 ? `${n}+${enCaja}` : String(n);
+  };
+
   const rowH = 12 * s;
   const nameW = Math.max(
     ...low.map(([id]) => textWidth(product(id).name.toUpperCase(), s)),
     textWidth('REPONER', s),
   );
+  const valorW = Math.max(...low.map(([id, n]) => textWidth(valor(id, n), s)));
   const icon0 = itemSpriteScaled(low[0][0], s);
-  const boxW = nameW + icon0.w + 34 * s;
+  const boxW = nameW + valorW + icon0.w + 18 * s;
   const boxH = rowH * low.length + 12 * s;
   const x = vp.x + 4 * s;
   const y = vp.y + vp.h - boxH - HUD_BOTTOM * s;
@@ -127,9 +134,7 @@ function drawStockAlerts(ctx: CanvasRenderingContext2D, vp: Viewport, sim: Store
       color: n === 0 ? UI.bad : UI.warn,
       scale: s,
     });
-    // El punto avisa que ya hay cajas compradas esperando en el depósito.
-    const waiting = (inBoxes.get(id) ?? 0) > 0;
-    drawText(ctx, waiting ? `${n} •` : String(n), x + boxW - 5 * s, ry + 2 * s, {
+    drawText(ctx, valor(id, n), x + boxW - 5 * s, ry + 2 * s, {
       color: n === 0 ? UI.bad : UI.warn,
       align: 'right',
       scale: s,
