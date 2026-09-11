@@ -58,6 +58,8 @@ export interface Progress {
   /** Tiendas que el jugador ya visitó al menos una vez. */
   seenStores: StoreId[];
   muted: boolean;
+  /** Cómo se dibuja el local: en 3D o en pixel art. */
+  vista: 'tres-d' | 'pixel';
 }
 
 const KEY = 'mia-kiki-market/progreso';
@@ -78,6 +80,7 @@ export function defaultProgress(): Progress {
     upgrades: {},
     seenStores: ['pizzeria'],
     muted: false,
+    vista: 'tres-d',
   };
 }
 

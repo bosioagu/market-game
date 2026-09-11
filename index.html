@@ -37,13 +37,19 @@
         -webkit-tap-highlight-color: transparent;
         font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
       }
+      #mundo,
       #juego {
+        position: fixed;
+        inset: 0;
         display: block;
         width: 100vw;
         height: 100vh;
+        touch-action: none;
+      }
+      /* El 2D va encima del 3D y sólo pinta carteles y menús. */
+      #juego {
         image-rendering: pixelated;
         image-rendering: crisp-edges;
-        touch-action: none;
       }
       #cargando {
         position: fixed;
@@ -69,6 +75,7 @@
     </style>
   </head>
   <body>
+    <canvas id="mundo"></canvas>
     <canvas id="juego"></canvas>
     <div id="cargando"><b>MÍA &amp; KIKI MARKET</b><span>cargando…</span></div>
     <noscript>Para jugar hace falta activar JavaScript.</noscript>

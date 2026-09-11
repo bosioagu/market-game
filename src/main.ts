@@ -8,7 +8,8 @@ function boot(): void {
   if (!(canvas instanceof HTMLCanvasElement)) {
     throw new Error('Falta el <canvas id="juego"> en la página');
   }
-  const app = new App(canvas);
+  const canvas3d = document.getElementById('mundo');
+  const app = new App(canvas, canvas3d instanceof HTMLCanvasElement ? canvas3d : null);
   app.start(new MenuScene('titulo'));
   // Enganche para depurar y para la prueba automática de `tools/smoke.mjs`.
   (window as unknown as Record<string, unknown>).juego = app;

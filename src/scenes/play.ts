@@ -8,6 +8,8 @@ import { drawPanel, drawButton, UI, uiScaleFor } from '../ui/panel';
 import { MenuCursor } from '../ui/cursor';
 import { ManagerUi } from '../ui/manager';
 import { drawStore, type Viewport } from '../game/render';
+import { StoreScene3D } from '../game3d/scene3d';
+import { drawWorldLabels } from '../game3d/overlay3d';
 import { drawHud } from '../game/hud';
 import { DAY_SECONDS, StoreSim, type GameMode, type InteractTarget } from '../game/session';
 import { store, type StoreId } from '../game/data/stores';
@@ -20,7 +22,7 @@ const VERSUS_BUDGET = 5000;
 const GRACE_SECONDS = 8;
 const CLOSING_SECONDS = 12;
 
-const PAUSE_OPTIONS = ['SEGUIR JUGANDO', 'SILENCIAR', 'SALIR AL MENÚ'];
+const PAUSE_OPTIONS = ['SEGUIR JUGANDO', 'SILENCIAR', 'VISTA', 'SALIR AL MENÚ'];
 
 export class PlayScene implements Scene {
   private readonly mode: GameMode;
@@ -31,6 +33,8 @@ export class PlayScene implements Scene {
   private closing = -1;
   private paused = false;
   private pauseCursor = new MenuCursor();
+  /** Una escena 3D por local; vacío cuando se juega en pixel art. */
+  private escenas3d: StoreScene3D[] = [];
 
   constructor(mode: GameMode, storeId: StoreId) {
     this.mode = mode;
@@ -55,6 +59,18 @@ export class PlayScene implements Scene {
       this.sims = [new StoreSim(def, app.progress, padIndices, seed)];
       if (app.progress.day === 1) this.seedStock(this.sims[0], 3);
     }
+    this.aplicarVista(app);
+  }
+
+  exit(): void {
+    for (const e of this.escenas3d) e.dispose();
+    this.escenas3d = [];
+  }
+
+  /** Arma o descarta las escenas 3D según la vista elegida. */
+  private aplicarVista(app: App): void {
+    for (const e of this.escenas3d) e.dispose();
+    this.escenas3d = app.vista === 'tres-d' ? this.sims.map((sim) => new StoreScene3D(sim)) : [];
   }
 
   /** Regalo de arranque para que el primer día no empiece con el local vacío. */
@@ -65,6 +81,10 @@ export class PlayScene implements Scene {
   }
 
   update(dt: number, app: App): void {
+    if (app.input.keyPressed('KeyV')) {
+      this.cambiarVista(app);
+    }
+
     if (app.input.keyPressed('Escape') || app.input.keyPressed('KeyP')) {
       this.paused = !this.paused;
       this.pauseCursor.reset(0);
@@ -111,6 +131,8 @@ export class PlayScene implements Scene {
       if (open && this.elapsed > GRACE_SECONDS) sim.spawnTick(dt);
     }
 
+    for (const escena of this.escenas3d) escena.update(dt);
+
     const everyoneGone = this.sims.every((s) => s.customers.length === 0);
     if (this.closing >= 0 && (everyoneGone || this.closing > CLOSING_SECONDS)) {
       this.finishDay(app);
@@ -133,10 +155,24 @@ export class PlayScene implements Scene {
         app.save();
         break;
       case 2:
+        this.cambiarVista(app);
+        break;
+      case 3:
         audio.sfx('back');
         app.setScene(new MenuScene('modo'));
         break;
     }
+  }
+
+  private cambiarVista(app: App): void {
+    if (!app.render3d) {
+      audio.sfx('error');
+      return;
+    }
+    app.progress.vista = app.progress.vista === 'tres-d' ? 'pixel' : 'tres-d';
+    this.aplicarVista(app);
+    app.save();
+    audio.sfx('select');
   }
 
   private finishDay(app: App): void {
@@ -163,11 +199,18 @@ export class PlayScene implements Scene {
 
     viewports.forEach((vp, i) => {
       const sim = this.mode === 'versus' ? this.sims[i] : this.sims[0];
+      const escena = this.mode === 'versus' ? this.escenas3d[i] : this.escenas3d[0];
       const player = sim.players.find((p) => p.index === i) ?? sim.players[0];
       const targets = new Map<number, InteractTarget | null>();
       for (const p of sim.players) targets.set(p.index, sim.findTarget(p));
 
-      drawStore(ctx, sim, vp, player.pos, targets, i);
+      if (escena && app.render3d) {
+        const cam = escena.cameraFor(i, player.pos, vp);
+        app.render3d.renderViewport(escena.scene, cam, vp);
+        drawWorldLabels(ctx, escena, cam, sim, vp, i, targets);
+      } else {
+        drawStore(ctx, sim, vp, player.pos, targets, i);
+      }
       drawHud(ctx, vp, sim, app.progress, {
         elapsed: this.elapsed,
         day: app.progress.day,
@@ -290,7 +333,7 @@ export class PlayScene implements Scene {
     drawText(ctx, 'PAUSA', x + pw / 2, y + 5 * s, { color: UI.gold, align: 'center', scale: s + 1 });
     PAUSE_OPTIONS.forEach((label, i) => {
       const text = i === 1 ? (audio.muted ? 'SONIDO: NO' : 'SONIDO: SÍ') : label;
-      drawButton(ctx, text, x + 8 * s, y + 20 * s + i * 16 * s, pw - 16 * s, 12 * s, s, {
+      drawButton(ctx, label === 'VISTA' ? (this.escenas3d.length > 0 ? 'VISTA: 3D' : 'VISTA: PIXEL ART') : text, x + 8 * s, y + 20 * s + i * 16 * s, pw - 16 * s, 12 * s, s, {
         selected: i === this.pauseCursor.index,
       });
     });

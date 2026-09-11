@@ -1,8 +1,9 @@
 # Mía & Kiki Market
 
-Juego de tienda en pixel art para PC y celular. Comprás mercadería al mayorista,
-le ponés precio, reponés las góndolas y cobrás en la caja. Se juega solo o de a
-dos en **pantalla dividida**.
+Juego de tienda para PC y celular. Comprás mercadería al mayorista, le ponés
+precio, reponés las góndolas y cobrás en la caja. Se juega solo o de a dos en
+**pantalla dividida**, y se puede ver de dos maneras: **local en 3D** (la que
+viene puesta) o **pixel art** en vista cenital.
 
 > La idea original es de Mía: *"un juego donde tenés que rellenar una tienda de
 > algo, y cuando subís de nivel vas a otra tienda, y la pantalla se divide para
@@ -64,6 +65,7 @@ las flechas, indistintamente, y `Espacio` o `Enter` para la acción.
 | Soltar la caja / salir de un menú | `Q` o `Shift` izquierdo | `Shift` derecho o `/` |
 
 - **Pausa:** `Esc` o `P`. **Silenciar:** `M` en el menú.
+- **Cambiar de vista (3D / pixel art):** `V` mientras jugás, o desde la pausa.
 - **Joystick:** si conectás uno o dos mandos, andan solos (stick o cruceta,
   botón A para acción y B para soltar).
 - **Celular:** aparecen un joystick virtual y los botones al tocar la pantalla.
@@ -118,7 +120,7 @@ src/
     font.ts      tipografía bitmap 5x8 dibujada a mano, con acentos y eñe
     audio.ts     efectos y música chiptune sintetizados con WebAudio
     input.ts     teclado, joystick y táctil unificados en "pads"
-  art/         el arte, escrito como filas de texto
+  art/         el arte 2D, escrito como filas de texto
     chars.ts     personajes (una plantilla + colores por personaje)
     items.ts     íconos de productos de 12x12
     stations.ts  muebles del local de 16x22
@@ -127,14 +129,19 @@ src/
     data/        catálogo de productos y definición de las tiendas
     world.ts     grilla del local, colisiones y navegación de clientes
     session.ts   la simulación: clientes, caja, stock, plata
-    render.ts    dibujado del local con cámara y orden por profundidad
+    render.ts    vista de pixel art, con cámara y orden por profundidad
     hud.ts       marcadores en pantalla
     progress.ts  partida guardada y mejoras
+  game3d/      vista 3D (three.js)
+    textures.ts  piso, paredes y envases generados en un canvas
+    models.ts    góndolas, cajas, personajes: todo con primitivas
+    scene3d.ts   arma el local desde el mismo plano de tiles y lo dibuja
+    overlay3d.ts carteles del mundo proyectados sobre la escena
   ui/          computadora del local, paneles, controles táctiles
   scenes/      título, menú, día de trabajo y cierre
 ```
 
-Dos decisiones que explican casi todo lo demás:
+Tres decisiones que explican casi todo lo demás:
 
 - **El arte se escribe como texto.** Cada sprite es una lista de filas donde cada
   letra es un color de la paleta (`src/art/`). Se puede editar en cualquier
@@ -144,6 +151,10 @@ Dos decisiones que explican casi todo lo demás:
 - **Los clientes navegan con un campo de distancias.** Por cada destino se
   calcula un BFS sobre los tiles caminables y se cachea (`World.flowField`). En
   locales de 24x16 tiles es instantáneo y permite muchos clientes a la vez.
+- **La simulación no sabe nada de cómo se dibuja.** Todo pasa en la grilla de
+  tiles de `world.ts`; la vista de pixel art y la de 3D son dos lectores de ese
+  mismo estado. Por eso se puede cambiar de una a otra en mitad de un día sin
+  que se mueva un solo cliente, y por eso agregar una tienda no toca el 3D.
 
 ### Agregar cosas
 
@@ -156,9 +167,25 @@ Dos decisiones que explican casi todo lo demás:
 - **Un dibujo nuevo:** una entrada en `src/art/items.ts` con 12 filas de 12
   caracteres.
 
+### Sobre la vista 3D
+
+El local, los muebles, los envases y los personajes se generan con código: cajas
+y cilindros de three.js, y texturas dibujadas en un canvas que reusan los mismos
+íconos de pixel art. No hay modelos ni imágenes importadas, así que el juego
+sigue siendo un solo archivo y arranca al instante.
+
+Eso también marca el límite: los personajes son estilizados, de bloques. Para
+personajes realistas como los de un simulador comercial harían falta modelos 3D
+con esqueleto y animaciones, que son archivos de arte comprados aparte.
+
+Las góndolas pegadas a las paredes son decorado: ocupan la franja de tiles de
+pared, por donde nadie camina, así que llenan el local sin cambiar en nada la
+simulación.
+
 ## Qué falta / ideas para seguir
 
 - Empleados que repongan o cobren solos, a cambio de sueldo.
 - Clientes que roban si no mirás la caja.
 - Ofertas y días especiales (fin de semana, lluvia).
 - Decorar el local con muebles comprados.
+- Cámara en primera persona, además de la de tercera.

@@ -11,7 +11,11 @@ const URL = process.env.URL ?? 'http://localhost:4180';
 mkdirSync(OUT, { recursive: true });
 
 const errors = [];
-const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium' });
+const browser = await chromium.launch({
+  executablePath: process.env.CHROME || '/opt/pw-browsers/chromium',
+  // Sin GPU real, Chromium necesita que le habilitemos el WebGL por software.
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+});
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -113,25 +117,33 @@ if (!(fin.ventas > 0)) errors.push('las ventas quedaron en cero');
 
 // Adelantar el reloj para ver el cierre del día y el resumen.
 await page.evaluate(() => { window.juego.scene.elapsed = 164; });
-await page.waitForTimeout(15000);
+await page.waitForFunction(() => !!window.juego.scene.args, null, { timeout: 60000 }).catch(() => {});
+await page.waitForTimeout(600);
 await shot('13-cierre-del-dia');
 const enResultados = await page.evaluate(() => !!window.juego.scene.args);
 console.log('llegó a la pantalla de cierre:', enResultados);
+
+const vista3d = await page.evaluate(() => ({ webgl: !!window.juego.render3d, vista: window.juego.progress.vista }));
+console.log('render 3D disponible:', JSON.stringify(vista3d));
+if (!vista3d.webgl) errores.push('no se pudo crear el contexto WebGL');
 if (!enResultados) errors.push('el día no terminó en la pantalla de resultados');
 
 // --- Pantalla dividida: cooperativo y competencia, en PC y en celular ---
-async function dosJugadores(width, height, nombre, bajadas) {
+async function dosJugadores(width, height, nombre, modo) {
   const p2 = await browser.newPage({ viewport: { width, height } });
-  p2.on('pageerror', (e) => errors.push(`${nombre}: ${e.message}`));
+  p2.on('pageerror', (e) => errores.push(`${nombre}: ${e.message}`));
   await p2.goto(URL, { waitUntil: 'networkidle' });
-  await p2.waitForTimeout(600);
+
+  // Se navega el menú por estado, no por tiempos: con WebGL por software los
+  // frames tardan y las esperas fijas se desincronizan.
+  await p2.waitForFunction(() => window.juego?.scene?.step === 'titulo');
   await p2.keyboard.press('Space');
-  await p2.waitForTimeout(300);
-  for (let i = 0; i < bajadas; i++) { await p2.keyboard.press('KeyS'); await p2.waitForTimeout(140); }
+  await p2.waitForFunction(() => window.juego?.scene?.step === 'modo');
+  await p2.evaluate((m) => { window.juego.scene.cursor.index = m; }, modo);
   await p2.keyboard.press('Space');
-  await p2.waitForTimeout(300);
+  await p2.waitForFunction(() => window.juego?.scene?.step === 'tienda');
   await p2.keyboard.press('Space');
-  await p2.waitForTimeout(1000);
+  await p2.waitForFunction(() => Array.isArray(window.juego?.scene?.sims));
 
   const vistas = await p2.evaluate(() => {
     const sims = window.juego.scene.sims;
@@ -141,10 +153,16 @@ async function dosJugadores(width, height, nombre, bajadas) {
     }
     return sims.length;
   });
-  await p2.waitForTimeout(16000);
+  const esperadas = modo === 2 ? 2 : 1;
+  if (vistas !== esperadas) errores.push(`${nombre}: esperaba ${esperadas} local(es) y hubo ${vistas}`);
+
+  // Adelantar el reloj del local para que ya haya clientes adentro.
+  await p2.evaluate(() => { window.juego.scene.elapsed = 30; });
+  await p2.waitForTimeout(14000);
   await p2.screenshot({ path: `${OUT}/${nombre}.png` });
   const info = await p2.evaluate(() => window.juego.scene.sims.map((s) => s.customers.length));
   console.log(`${nombre}: ${vistas} local(es), clientes por local ${JSON.stringify(info)}`);
+  if (info.every((n) => n === 0)) errores.push(`${nombre}: no entró ningún cliente`);
   await p2.close();
 }
 
