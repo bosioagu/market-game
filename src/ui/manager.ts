@@ -246,14 +246,6 @@ export class ManagerUi {
       else this.drawProductRow(ctx, index, x, ry, w, s, sim, selected);
     }
 
-    if (count > visible) {
-      drawText(ctx, `${this.row + 1}/${count}`, x + w - 4 * s, listY - 9 * s, {
-        color: UI.dim,
-        align: 'right',
-        scale: s,
-      });
-    }
-
     const footY = y + h - 10 * s;
     const hint =
       this.tab === 'mayorista'
@@ -265,11 +257,19 @@ export class ManagerUi {
       color: this.message ? UI.gold : UI.dim,
       scale: s,
     });
-    drawText(ctx, '↑↓ MOVER (EN LOS EXTREMOS CAMBIA DE PESTAÑA)', x + 4 * s, footY, {
+    drawText(ctx, 'SALIR: Q / SHIFT', x + w - 4 * s, footY - 9 * s, {
       color: UI.dim,
+      align: 'right',
       scale: s,
     });
-    drawText(ctx, 'SALIR: Q / SHIFT', x + w - 4 * s, footY, { color: UI.dim, align: 'right', scale: s });
+    drawText(ctx, '↑↓ MOVER · EXTREMOS = PESTAÑA', x + 4 * s, footY, { color: UI.dim, scale: s });
+    if (count > visible) {
+      drawText(ctx, `${this.row + 1}/${count}`, x + w - 4 * s, footY, {
+        color: UI.dim,
+        align: 'right',
+        scale: s,
+      });
+    }
     ctx.restore();
   }
 
