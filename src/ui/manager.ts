@@ -39,6 +39,35 @@ export class ManagerUi {
   private message = '';
   private messageTime = 0;
 
+  /** Estado que necesita el dibujado; la lógica vive acá, el look afuera. */
+  get pestania(): Tab {
+    return this.tab;
+  }
+
+  get fila(): number {
+    return this.row;
+  }
+
+  get cantidad(): number {
+    return this.boxQty;
+  }
+
+  get mensaje(): string {
+    return this.message;
+  }
+
+  get pestanias(): readonly Tab[] {
+    return TABS;
+  }
+
+  etiquetaPestania(tab: Tab): string {
+    return TAB_LABEL[tab];
+  }
+
+  filas(sim: StoreSim): number {
+    return this.rowCount(sim);
+  }
+
   reset(): void {
     this.tab = 'mayorista';
     this.row = 0;

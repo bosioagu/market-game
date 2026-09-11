@@ -3,7 +3,9 @@
 Juego de tienda para PC y celular. Comprás mercadería al mayorista, le ponés
 precio, reponés las góndolas y cobrás en la caja. Se juega solo o de a dos en
 **pantalla dividida**, y se puede ver de dos maneras: **local en 3D** (la que
-viene puesta) o **pixel art** en vista cenital.
+viene puesta) o **pixel art** en vista cenital. Cada vista trae su propia
+interfaz: vidrio y tipografía limpia en 3D, plaquitas y tipografía de píxeles
+en pixel art.
 
 > La idea original es de Mía: *"un juego donde tenés que rellenar una tienda de
 > algo, y cuando subís de nivel vas a otra tienda, y la pantalla se divide para
@@ -137,7 +139,8 @@ src/
     models.ts    góndolas, cajas, personajes: todo con primitivas
     scene3d.ts   arma el local desde el mismo plano de tiles y lo dibuja
     overlay3d.ts carteles del mundo proyectados sobre la escena
-  ui/          computadora del local, paneles, controles táctiles
+  ui/          interfaz de la vista pixel art: plaquitas y tipografía bitmap
+  ui2/         interfaz de la vista 3D: vidrio, esquinas redondeadas, Nunito
   scenes/      título, menú, día de trabajo y cierre
 ```
 
@@ -166,6 +169,18 @@ Tres decisiones que explican casi todo lo demás:
   arriba del mismo archivo.
 - **Un dibujo nuevo:** una entrada en `src/art/items.ts` con 12 filas de 12
   caracteres.
+
+### Sobre las dos interfaces
+
+Sobre un local en 3D, la tipografía de píxeles se veía fuera de época, así que
+la vista 3D tiene su propio idioma visual (`src/ui2/`): tarjetas de vidrio
+oscuro, esquinas redondeadas, iconos vectoriales y la tipografía Nunito, con
+respaldo en la del sistema si no hay red. La vista de pixel art conserva su HUD
+original, donde ese estilo es el correcto.
+
+Lo que **no** está duplicado son las reglas: la computadora del local, por
+ejemplo, tiene una sola lógica (`src/ui/manager.ts`) y dos dibujados. Las
+pantallas nuevas sólo saben pintar.
 
 ### Sobre la vista 3D
 

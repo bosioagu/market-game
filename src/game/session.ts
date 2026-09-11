@@ -358,7 +358,8 @@ export class StoreSim {
       const d = Math.hypot(shelf.x - player.pos.x, shelf.y - player.pos.y);
       if (d >= 22) continue;
       const label = shelf.productId ? product(shelf.productId).name : 'Góndola vacía';
-      const hint = player.carrying ? 'Reponer' : `${shelf.units}/${shelf.capacity}`;
+      // Sin una caja en la mano no hay nada que hacer acá: mejor decirlo.
+      const hint = player.carrying ? 'Reponer' : 'Traé una caja';
       push({ kind: 'shelf', label, hint, x: shelf.x, y: shelf.y, shelf }, d);
     }
 
@@ -620,16 +621,21 @@ export class StoreSim {
     return this.def.products.map((id) => product(id));
   }
 
-  /** Semáforo de precio, para la pantalla de precios. */
+  /**
+   * Semáforo de precio.
+   *
+   * Se mide contra el precio de mercado, no contra la demanda: "barato" tiene
+   * que significar que estás dejando plata sobre la mesa, no que vendés bien.
+   */
   priceVerdict(id: string): { text: string; color: string } {
     const price = this.priceOf(id);
     const def = product(id);
-    if (price < def.cost) return { text: 'PERDÉS PLATA', color: '#ff6a6a' };
-    const d = demandFor(id, price);
-    if (d >= 0.9) return { text: 'BARATO', color: '#9af2a0' };
-    if (d >= 0.6) return { text: 'BIEN', color: '#9af2a0' };
-    if (d >= 0.3) return { text: 'CARO', color: '#ffd36a' };
-    return { text: 'CARÍSIMO', color: '#ff6a6a' };
+    if (price < def.cost) return { text: 'PERDÉS PLATA', color: '#ff5c5c' };
+    const ratio = price / def.market;
+    if (ratio <= 0.85) return { text: 'BARATO', color: '#63b3ff' };
+    if (ratio <= 1.08) return { text: 'BIEN', color: '#3ddc84' };
+    if (demandFor(id, price) >= 0.3) return { text: 'CARO', color: '#ffb020' };
+    return { text: 'CARÍSIMO', color: '#ff5c5c' };
   }
 }
 

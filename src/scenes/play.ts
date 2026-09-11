@@ -11,6 +11,10 @@ import { drawStore, type Viewport } from '../game/render';
 import { StoreScene3D } from '../game3d/scene3d';
 import { drawWorldLabels } from '../game3d/overlay3d';
 import { drawHud } from '../game/hud';
+import { drawHud2, resetHud2 } from '../ui2/hud2';
+import { drawManager2 } from '../ui2/manager2';
+import { drawAviso2, drawBanner2, drawPausa2 } from '../ui2/pantallas2';
+import { preloadFont } from '../ui2/theme';
 import { DAY_SECONDS, StoreSim, type GameMode, type InteractTarget } from '../game/session';
 import { store, type StoreId } from '../game/data/stores';
 import { product } from '../game/data/products';
@@ -35,6 +39,8 @@ export class PlayScene implements Scene {
   private pauseCursor = new MenuCursor();
   /** Una escena 3D por local; vacío cuando se juega en pixel art. */
   private escenas3d: StoreScene3D[] = [];
+  /** Último delta, para las animaciones del HUD moderno. */
+  private ultimoDt = 0;
 
   constructor(mode: GameMode, storeId: StoreId) {
     this.mode = mode;
@@ -60,6 +66,8 @@ export class PlayScene implements Scene {
       if (app.progress.day === 1) this.seedStock(this.sims[0], 3);
     }
     this.aplicarVista(app);
+    resetHud2();
+    preloadFont();
   }
 
   exit(): void {
@@ -81,6 +89,7 @@ export class PlayScene implements Scene {
   }
 
   update(dt: number, app: App): void {
+    this.ultimoDt = dt;
     if (app.input.keyPressed('KeyV')) {
       this.cambiarVista(app);
     }
@@ -207,19 +216,35 @@ export class PlayScene implements Scene {
       if (escena && app.render3d) {
         const cam = escena.cameraFor(i, player.pos, vp);
         app.render3d.renderViewport(escena.scene, cam, vp);
-        drawWorldLabels(ctx, escena, cam, sim, vp, i, targets);
+        drawWorldLabels(ctx, escena, cam, sim, vp, i, targets, { tecla: this.nombreBoton(app, i) });
+        drawHud2(
+          ctx,
+          vp,
+          sim,
+          app.progress,
+          {
+            elapsed: this.elapsed,
+            day: app.progress.day,
+            nombre: this.mode === 'solo' ? undefined : player.name,
+            color: i === 0 ? '#ff8fae' : '#7fe3d8',
+          },
+          i,
+          this.ultimoDt,
+        );
+        if (sim.computerUser === i && this.managers[i].open) {
+          drawManager2(ctx, vp, this.managers[i], sim, app.progress);
+        }
       } else {
         drawStore(ctx, sim, vp, player.pos, targets, i);
-      }
-      drawHud(ctx, vp, sim, app.progress, {
-        elapsed: this.elapsed,
-        day: app.progress.day,
-        label: this.mode === 'solo' ? undefined : player.name,
-      });
-      this.drawPlayerStrip(ctx, vp, sim, i);
-
-      if (sim.computerUser === i && this.managers[i].open) {
-        this.managers[i].draw(ctx, vp, sim, app.progress);
+        drawHud(ctx, vp, sim, app.progress, {
+          elapsed: this.elapsed,
+          day: app.progress.day,
+          label: this.mode === 'solo' ? undefined : player.name,
+        });
+        this.drawPlayerStrip(ctx, vp, sim, i);
+        if (sim.computerUser === i && this.managers[i].open) {
+          this.managers[i].draw(ctx, vp, sim, app.progress);
+        }
       }
     });
 
@@ -230,14 +255,39 @@ export class PlayScene implements Scene {
       else ctx.fillRect(0, Math.floor(h / 2) - 1, w, 3);
     }
 
-    if (this.closing >= 0) this.drawClosing(ctx, w, h);
-    else if (this.elapsed < GRACE_SECONDS) this.drawOpening(ctx, w, h);
+    const moderno = this.escenas3d.length > 0;
+    if (this.closing >= 0) this.drawClosing(ctx, w, h, moderno);
+    else if (this.elapsed < GRACE_SECONDS) this.drawOpening(ctx, w, h, moderno);
 
     const managerOpen = this.managers.some((m) => m.open);
     const tutorial = managerOpen ? null : this.tutorialHint(app.progress);
-    if (tutorial) this.drawBanner(ctx, w, h, tutorial);
+    if (tutorial) {
+      if (moderno) drawBanner2(ctx, w, h, tutorial);
+      else this.drawBanner(ctx, w, h, tutorial);
+    }
 
-    if (this.paused) this.drawPause(ctx, w, h);
+    if (this.paused) {
+      if (moderno) {
+        drawPausa2(ctx, w, h, this.etiquetasPausa(), this.pauseCursor.index, this.sims[0].def.accent);
+      } else {
+        this.drawPause(ctx, w, h);
+      }
+    }
+  }
+
+  /** Cómo se llama el botón de acción según con qué se esté jugando. */
+  private nombreBoton(app: App, padIndex: number): string {
+    if (app.input.lastSource === 'touch') return 'OK';
+    if (app.input.lastSource === 'gamepad') return 'A';
+    return padIndex === 0 ? 'ESPACIO' : 'ENTER';
+  }
+
+  private etiquetasPausa(): string[] {
+    return PAUSE_OPTIONS.map((label, i) => {
+      if (i === 1) return audio.muted ? 'Sonido: no' : 'Sonido: sí';
+      if (i === 2) return this.escenas3d.length > 0 ? 'Vista: 3D' : 'Vista: pixel art';
+      return label;
+    });
   }
 
   /** Qué lleva el jugador en las manos, debajo del marcador de la derecha. */
@@ -260,10 +310,10 @@ export class PlayScene implements Scene {
     const hasBoxes = sim.world.boxes.length > 0;
     const carrying = sim.players.some((p) => p.carrying !== null);
     const stocked = sim.world.shelves.some((s) => s.units > 0);
-    if (!stocked && !carrying && !hasBoxes) return 'ANDÁ A LA COMPUTADORA Y COMPRÁ CAJAS AL MAYORISTA';
-    if (!carrying && !stocked) return 'LEVANTÁ UNA CAJA DEL DEPÓSITO CON EL BOTÓN DE ACCIÓN';
-    if (!stocked) return 'LLEVALA A UNA GÓNDOLA Y MANTENÉ EL BOTÓN PARA REPONER';
-    if (sim.stats.served === 0) return 'ESPERÁ A LOS CLIENTES Y COBRALES EN LA CAJA';
+    if (!stocked && !carrying && !hasBoxes) return 'Andá a la computadora y comprá cajas al mayorista';
+    if (!carrying && !stocked) return 'Levantá una caja del depósito con el botón de acción';
+    if (!stocked) return 'Llevala a una góndola y mantené el botón para reponer';
+    if (sim.stats.served === 0) return 'Esperá a los clientes y cobrales en la caja';
     return null;
   }
 
@@ -286,9 +336,13 @@ export class PlayScene implements Scene {
     });
   }
 
-  private drawOpening(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-    const s = uiScaleFor(w, h);
+  private drawOpening(ctx: CanvasRenderingContext2D, w: number, h: number, moderno: boolean): void {
     const left = Math.ceil(GRACE_SECONDS - this.elapsed);
+    if (moderno) {
+      drawAviso2(ctx, w, h, `Abre en ${left}`, 'Aprovechá para reponer');
+      return;
+    }
+    const s = uiScaleFor(w, h);
     drawText(ctx, `ABRE EN ${left}`, w / 2, Math.round(h * 0.32), {
       color: UI.gold,
       align: 'center',
@@ -303,7 +357,11 @@ export class PlayScene implements Scene {
     });
   }
 
-  private drawClosing(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  private drawClosing(ctx: CanvasRenderingContext2D, w: number, h: number, moderno: boolean): void {
+    if (moderno) {
+      drawAviso2(ctx, w, h, 'Cerramos', 'Últimos clientes…', clamp(this.closing / CLOSING_SECONDS, 0, 0.55));
+      return;
+    }
     const s = uiScaleFor(w, h);
     ctx.fillStyle = `rgba(10, 8, 16, ${clamp(this.closing / CLOSING_SECONDS, 0, 0.5)})`;
     ctx.fillRect(0, 0, w, h);

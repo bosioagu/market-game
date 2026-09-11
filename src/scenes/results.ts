@@ -8,6 +8,7 @@ import { MenuCursor } from '../ui/cursor';
 import { careerLevel } from '../game/progress';
 import { nextLevelEarnings, store, STORES, type StoreId } from '../game/data/stores';
 import type { GameMode, StoreSim } from '../game/session';
+import { drawCierre2, drawVersus2 } from '../ui2/pantallas2';
 import { MenuScene } from './menu';
 import { PlayScene } from './play';
 
@@ -64,6 +65,10 @@ export class ResultsScene implements Scene {
   }
 
   draw(ctx: CanvasRenderingContext2D, w: number, h: number, app: App): void {
+    if (app.vista === 'tres-d') {
+      this.drawModerno(ctx, w, h, app);
+      return;
+    }
     const s = uiScaleFor(w, h);
     ctx.fillStyle = '#1a1426';
     ctx.fillRect(0, 0, w, h);
@@ -82,6 +87,25 @@ export class ResultsScene implements Scene {
       drawButton(ctx, label, x + 8 * s + i * bw, y + ph - 18 * s, bw - 4 * s, 12 * s, s, {
         selected: i === this.cursor.index,
       });
+    });
+  }
+
+  /** Mismo contenido, con la interfaz moderna que acompaña a la vista 3D. */
+  private drawModerno(ctx: CanvasRenderingContext2D, w: number, h: number, app: App): void {
+    const opciones = ['Otro día', 'Otra tienda', 'Menú'];
+    if (this.args.mode === 'versus') {
+      drawVersus2(ctx, w, h, { sims: this.args.sims, opciones, elegida: this.cursor.index });
+      return;
+    }
+    drawCierre2(ctx, w, h, {
+      sim: this.args.sims[0],
+      storeId: this.args.storeId,
+      alquiler: this.args.rent,
+      progress: app.progress,
+      subioNivel: this.levelUp,
+      desbloqueadas: this.unlocked,
+      opciones,
+      elegida: this.cursor.index,
     });
   }
 

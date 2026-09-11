@@ -300,9 +300,16 @@ export class StoreScene3D {
   }
 
   private buildSign(anchoU: number, def: World['def']): void {
+    // Con transparencia: si no, las esquinas redondeadas del cartel se
+    // dibujarían como un recuadro negro.
     const cartel = new Mesh(
       new PlaneGeometry(6, 1.5),
-      new MeshBasicMaterial({ map: signTexture(def.name, def.accent), side: DoubleSide }),
+      new MeshBasicMaterial({
+        map: signTexture(def.name, def.accent),
+        side: DoubleSide,
+        transparent: true,
+        alphaTest: 0.5,
+      }),
     );
     cartel.position.set(anchoU / 2, WALL_H - 0.85, 0.06);
     this.scene.add(cartel);

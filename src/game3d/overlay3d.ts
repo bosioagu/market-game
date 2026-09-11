@@ -1,21 +1,25 @@
 /**
  * Carteles del mundo dibujados sobre la escena 3D.
  *
- * Los números de stock, lo que quiere cada cliente, la paciencia y el cartel de
- * "qué puedo hacer acá" se dibujan con el canvas 2D encima del 3D: se proyecta
- * la posición del mundo a la pantalla y se usa la misma tipografía de píxeles
- * que el resto del juego, así las dos vistas dan la misma información.
+ * Se proyecta la posición del mundo a la pantalla y se dibuja con el canvas 2D
+ * que va encima. Usa la interfaz moderna (`src/ui2`), no la tipografía de
+ * píxeles: sobre un local en 3D, esa mezcla era justamente lo que se veía viejo.
  */
 
 import type { PerspectiveCamera } from 'three';
-import { drawText, textWidth } from '../engine/font';
 import { clamp } from '../engine/math';
 import { product } from '../game/data/products';
 import type { InteractTarget, StoreSim } from '../game/session';
 import type { Viewport } from '../game/render';
-import { itemSpriteScaled } from '../game/render';
+import { bar, card, chip, measure, mixAlpha, T, text, uiScale } from '../ui2/theme';
+import { packageCanvas } from './textures';
 import { GONDOLA_H } from './models';
 import type { StoreScene3D } from './scene3d';
+
+export interface OverlayOptions {
+  /** Cómo se llama el botón de acción en este momento: "ESPACIO", "OK"... */
+  tecla: string;
+}
 
 export function drawWorldLabels(
   ctx: CanvasRenderingContext2D,
@@ -25,8 +29,9 @@ export function drawWorldLabels(
   vp: Viewport,
   focusIndex: number,
   targets: Map<number, InteractTarget | null>,
+  opts: OverlayOptions,
 ): void {
-  const s = Math.max(1, Math.min(3, Math.round(Math.min(vp.w / 230, vp.h / 180))));
+  const s = uiScale(vp.w, vp.h);
 
   ctx.save();
   ctx.beginPath();
@@ -38,122 +43,168 @@ export function drawWorldLabels(
     if (t?.kind === 'shelf' && t.shelf) apuntadas.add(t.shelf.index);
   }
 
-  // Stock de cada góndola.
   for (const shelf of sim.world.shelves) {
-    const p = escena.project(cam, shelf.x, shelf.y, GONDOLA_H + 0.45, vp);
-    if (!p.visible) continue;
-    // El número sólo cuando hace falta: una góndola llena ya se ve llena, y
-    // doce carteles a la vez tapan el local.
-    if (shelf.units > 0 && (shelf.units <= 4 || apuntadas.has(shelf.index))) {
-      etiqueta(ctx, String(shelf.units), p.x, p.y, Math.max(1, s - 1), shelf.units <= 2 ? '#ffb86a' : '#fff6e8');
-    } else if (shelf.units === 0 && apuntadas.has(shelf.index)) {
-      etiqueta(ctx, 'VACÍA', p.x, p.y, s, '#ff9a9a');
+    const apuntada = apuntadas.has(shelf.index);
+    if (apuntada) {
+      const p = escena.project(cam, shelf.x, shelf.y, GONDOLA_H + 0.7, vp);
+      if (p.visible) fichaGondola(ctx, shelf, p.x, p.y, s);
+      continue;
     }
-    if (apuntadas.has(shelf.index) && shelf.productId) {
-      const q = escena.project(cam, shelf.x, shelf.y, GONDOLA_H + 1.0, vp);
-      etiqueta(
-        ctx,
-        `${product(shelf.productId).name.toUpperCase()} ${shelf.units}/${shelf.capacity}`,
-        q.x,
-        q.y,
-        s,
-        '#fdf6ea',
-      );
+    // Una góndola llena ya se ve llena: el número sólo cuando escasea.
+    if (shelf.units > 0 && shelf.units <= 4) {
+      const p = escena.project(cam, shelf.x, shelf.y, GONDOLA_H + 0.45, vp);
+      if (p.visible) {
+        chip(ctx, String(shelf.units), p.x - 12 * s, p.y, 11 * s, shelf.units <= 2 ? T.bad : T.warn, {
+          solid: true,
+        });
+      }
     }
   }
 
-  // Clientes: qué buscan, cuánta paciencia les queda y cuánto tienen que pagar.
   for (const c of sim.customers) {
-    const cabeza = escena.project(cam, c.pos.x, c.pos.y, 1.95, vp);
+    const cabeza = escena.project(cam, c.pos.x, c.pos.y, 2.0, vp);
     if (!cabeza.visible) continue;
-    const color = c.mood === 'feliz' ? '#8ce89a' : c.mood === 'normal' ? '#ffd36a' : '#ff7a7a';
-    barra(ctx, cabeza.x, cabeza.y, s, c.patience, color);
+
+    const color = c.mood === 'feliz' ? T.good : c.mood === 'normal' ? T.warn : T.bad;
+    bar(ctx, cabeza.x - 17 * s, cabeza.y, 34 * s, 5 * s, c.patience, color, 'rgba(0,0,0,0.45)');
 
     if (c.state === 'pagando') {
-      etiqueta(ctx, `$${c.total}`, cabeza.x, cabeza.y - 12 * s, s, '#8ce89a');
+      chip(ctx, `$${c.total}`, cabeza.x - measure(ctx, `$${c.total}`, { size: 12 * s, weight: 800 }) / 2 - 8 * s, cabeza.y - 26 * s, 12 * s, T.good, { solid: true });
       continue;
     }
     const quiere = c.wants[0];
     if (!quiere || c.state === 'saliendo') continue;
-    const icono = itemSpriteScaled(quiere, s);
-    const bx = Math.round(cabeza.x - icono.w / 2 - 2 * s);
-    const by = Math.round(cabeza.y - icono.h - 9 * s);
-    ctx.fillStyle = 'rgba(253, 246, 234, 0.95)';
-    ctx.fillRect(bx, by, icono.w + 4 * s, icono.h + 4 * s);
-    ctx.fillStyle = '#2f2836';
-    ctx.fillRect(bx, by, icono.w + 4 * s, s);
-    ctx.fillRect(bx, by + icono.h + 3 * s, icono.w + 4 * s, s);
-    ctx.drawImage(icono.canvas, bx + 2 * s, by + 2 * s);
+    globoProducto(ctx, quiere, cabeza.x, cabeza.y - 12 * s, s);
   }
 
-  // Qué puede hacer el jugador de esta mitad.
   const jugador = sim.players.find((p) => p.index === focusIndex);
   if (jugador) {
     if (jugador.toast) {
-      const p = escena.project(cam, jugador.pos.x, jugador.pos.y, 2.2, vp);
-      etiqueta(ctx, jugador.toast, p.x, p.y, s, '#fdf6ea');
+      const p = escena.project(cam, jugador.pos.x, jugador.pos.y, 2.4, vp);
+      if (p.visible) pildora(ctx, jugador.toast, null, p.x, p.y, s, T.surfaceStrong);
     } else {
       const target = targets.get(focusIndex);
       if (target) {
-        const p = escena.project(cam, target.x, target.y, 2.0, vp);
-        if (p.visible) etiqueta(ctx, target.hint, p.x, p.y, s, '#ffe9a8');
+        const p = escena.project(cam, target.x, target.y, 2.1, vp);
+        if (p.visible) pildora(ctx, target.hint, opts.tecla, p.x, p.y, s, T.surfaceStrong);
       }
     }
     if (jugador.busy) {
-      const p = escena.project(cam, jugador.pos.x, jugador.pos.y, 2.0, vp);
-      barra(ctx, p.x, p.y, s, jugador.busy.progress / jugador.busy.duration, '#8ce89a');
+      const p = escena.project(cam, jugador.pos.x, jugador.pos.y, 2.1, vp);
+      if (p.visible) {
+        bar(ctx, p.x - 26 * s, p.y, 52 * s, 7 * s, jugador.busy.progress / jugador.busy.duration, T.good, 'rgba(0,0,0,0.5)');
+      }
     }
   }
 
-  // Plata que entra, avisos de falta de stock.
   for (const f of sim.floaters) {
-    const p = escena.project(cam, f.x, f.y, 1.6 + (1.3 - f.life) * 0.8, vp);
+    const p = escena.project(cam, f.x, f.y, 1.7 + (1.3 - f.life) * 0.9, vp);
     if (!p.visible) continue;
-    drawText(ctx, f.text, Math.round(p.x), Math.round(p.y), {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 6 * s;
+    text(ctx, f.text, p.x, p.y, {
+      size: 15 * s,
+      weight: 800,
       color: f.color,
       align: 'center',
-      scale: s,
-      outline: '#221c2a',
       alpha: clamp(f.life, 0, 1),
     });
+    ctx.restore();
   }
 
   ctx.restore();
 }
 
-function etiqueta(
+/** Tarjeta de la góndola que el jugador tiene enfrente. */
+function fichaGondola(
   ctx: CanvasRenderingContext2D,
-  texto: string,
-  x: number,
-  y: number,
+  shelf: { productId: string | null; units: number; capacity: number },
+  cx: number,
+  cy: number,
   s: number,
-  color: string,
 ): void {
-  const w = textWidth(texto, s) + 5 * s;
-  const h = 11 * s;
-  const px = Math.round(x - w / 2);
-  const py = Math.round(y - h);
-  ctx.fillStyle = 'rgba(26, 22, 34, 0.8)';
-  ctx.fillRect(px, py, w, h);
-  drawText(ctx, texto, Math.round(x), py + 2 * s, { color, align: 'center', scale: s });
+  const nombre = shelf.productId ? product(shelf.productId).name : 'Góndola vacía';
+  const w = Math.max(150 * s, measure(ctx, nombre, { size: 12 * s, weight: 800 }) + 96 * s);
+  const h = 40 * s;
+  const x = cx - w / 2;
+  const y = cy - h;
+  card(ctx, x, y, w, h, { radius: T.radiusSmall * s, fill: T.surfaceStrong });
+
+  if (shelf.productId) {
+    const lado = 24 * s;
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(packageCanvas(shelf.productId), x + 8 * s, y + 8 * s, lado, lado);
+    ctx.restore();
+  }
+  const tx = shelf.productId ? x + 38 * s : x + 12 * s;
+  text(ctx, nombre, tx, y + 8 * s, { size: 12 * s, weight: 800, color: T.text });
+  const ratio = shelf.capacity > 0 ? shelf.units / shelf.capacity : 0;
+  const color = shelf.units === 0 ? T.bad : ratio < 0.3 ? T.warn : T.good;
+  text(ctx, `${shelf.units} / ${shelf.capacity}`, tx, y + 23 * s, { size: 11 * s, color });
+  bar(ctx, x + w - 46 * s, y + 25 * s, 38 * s, 5 * s, ratio, color, 'rgba(0,0,0,0.4)');
 }
 
-function barra(
+/** Globo con el producto que el cliente está buscando. */
+function globoProducto(ctx: CanvasRenderingContext2D, id: string, cx: number, cy: number, s: number): void {
+  const lado = 26 * s;
+  const w = lado + 14 * s;
+  const h = lado + 12 * s;
+  const x = cx - w / 2;
+  const y = cy - h;
+  card(ctx, x, y, w, h, { radius: T.radiusSmall * s, fill: T.surfaceStrong });
+  // Puntita del globo, para que se lea de quién es.
+  ctx.beginPath();
+  ctx.moveTo(cx - 5 * s, y + h - 1);
+  ctx.lineTo(cx + 5 * s, y + h - 1);
+  ctx.lineTo(cx, y + h + 6 * s);
+  ctx.closePath();
+  ctx.fillStyle = T.surfaceStrong;
+  ctx.fill();
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(packageCanvas(id), x + 7 * s, y + 6 * s, lado, lado);
+  ctx.restore();
+}
+
+/** Cartel de acción: qué se puede hacer acá y con qué botón. */
+function pildora(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
+  texto: string,
+  tecla: string | null,
+  cx: number,
+  cy: number,
   s: number,
-  ratio: number,
-  color: string,
+  fondo: string,
 ): void {
-  const w = 16 * s;
-  const h = 3 * s;
-  const px = Math.round(x - w / 2);
-  const py = Math.round(y);
-  ctx.fillStyle = '#221c2a';
-  ctx.fillRect(px - s, py - s, w + 2 * s, h + 2 * s);
-  ctx.fillStyle = '#4a4453';
-  ctx.fillRect(px, py, w, h);
-  ctx.fillStyle = color;
-  ctx.fillRect(px, py, Math.round(w * clamp(ratio, 0, 1)), h);
+  const tamTexto = 12 * s;
+  const anchoTexto = measure(ctx, texto, { size: tamTexto, weight: 800 });
+  const anchoTecla = tecla ? measure(ctx, tecla, { size: 10 * s, weight: 800 }) + 14 * s : 0;
+  const w = anchoTexto + anchoTecla + (tecla ? 30 * s : 24 * s);
+  const h = 28 * s;
+  const x = cx - w / 2;
+  const y = cy - h;
+  card(ctx, x, y, w, h, { radius: T.radiusPill, fill: fondo });
+
+  let cursor = x + 12 * s;
+  if (tecla) {
+    const chipW = anchoTecla;
+    card(ctx, cursor, y + 6 * s, chipW, h - 12 * s, {
+      radius: T.radiusSmall * s,
+      fill: mixAlpha(T.text, 0.14),
+      border: mixAlpha(T.text, 0.3),
+      shadow: false,
+    });
+    text(ctx, tecla, cursor + chipW / 2, y + h / 2, {
+      size: 10 * s,
+      weight: 800,
+      color: T.text,
+      align: 'center',
+      baseline: 'middle',
+    });
+    cursor += chipW + 8 * s;
+  }
+  text(ctx, texto, cursor, y + h / 2, { size: tamTexto, weight: 800, color: T.text, baseline: 'middle' });
 }
